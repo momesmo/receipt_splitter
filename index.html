@@ -414,7 +414,7 @@
                 <td><input type="text" placeholder="Enter item name" class="item-name"></td>
                 <td><input type="number" step="0.01" placeholder="0.00" class="item-cost" onchange="calculateSummary()"></td>
                 <td>
-                    <select class="item-payer" onchange="handlePayerChange(this); calculateSummary()">
+                    <select class="item-payer" onchange="handlePayerChange(this); calculateSummary(); validateCustomSplit(this)">
                         <option value="${person1Name}">${person1Name}</option>
                         <option value="${person2Name}">${person2Name}</option>
                         <option value="Split">${splitOption}</option>
