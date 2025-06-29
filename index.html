@@ -34,6 +34,14 @@
             border-radius: 8px;
             margin-bottom: 20px;
             border-left: 4px solid #2196f3;
+            position: relative;
+        }
+
+        .config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
         }
         
         .config-section h3 {
@@ -158,19 +166,25 @@
             padding: 15px;
             border-radius: 8px;
             margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            align-items: center;
+            justify-content: center;
         }
         
-        .tax-input {
+        .amount-input {
             display: flex;
             align-items: center;
             gap: 10px;
+            margin-bottom: 0;
         }
         
-        .tax-input label {
+        .amount-input label {
             font-weight: bold;
         }
         
-        .tax-input input {
+        .amount-input input {
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -241,17 +255,16 @@
             margin-top: 0;
             color: #856404;
         }
-        
-        .input-table th:nth-child(1),
-        .running-total-table th:nth-child(1) { width: 30%; }
-        .input-table th:nth-child(2),
-        .running-total-table th:nth-child(2) { width: 10%; }
-        .input-table th:nth-child(3),
-        .running-total-table th:nth-child(3) { width: 25%; }
-        .input-table th:nth-child(4),
-        .running-total-table th:nth-child(4) { width: 25%; }
-        .input-table th:nth-child(5),
-        .running-total-table th:nth-child(4) { width: 10%; }
+
+        .running-total-table th {
+            width: 25%;
+        }
+
+        .input-table th:nth-child(1) { width: 25%; } /* Item Description */
+        .input-table th:nth-child(2) { width: 15%; } /* Cost ($) */
+        .input-table th:nth-child(3) { width: 20%; } /* Expense To */
+        .input-table th:nth-child(4) { width: 30%; } /* Custom Split */
+        .input-table th:nth-child(5) { width: 10%; } /* Action */
         
         .input-table input, .input-table select {
             width: 100%;
@@ -266,6 +279,17 @@
             min-width: 60px;
             width: 100%;
         }
+        .person-config-flex {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .person-config-flex label {
+            margin-bottom: 0;
+        }
+        .person-config-flex input {
+            flex: 1 1 auto;
+        }
     </style>
 </head>
 <body>
@@ -273,22 +297,12 @@
         <h1>Grocery Receipt Cost Splitter</h1>
         
         <div class="config-section">
-            <h3>Configuration</h3>
-            <div class="config-row">
-                <div class="config-input">
-                    <label for="person1-name">Person 1 Name:</label>
-                    <input type="text" id="person1-name" value="Person 1" onchange="updatePersonNames()">
-                </div>
-                <div class="config-input">
-                    <label for="person2-name">Person 2 Name:</label>
-                    <input type="text" id="person2-name" value="Person 2" onchange="updatePersonNames()">
-                </div>
+            <div class="config-header">
+                <h3>Configuration</h3>
+                <button id="add-person-btn" type="button" onclick="addPerson()">+ Add Person</button>
             </div>
-            <div class="config-row">
-                <div class="config-input">
-                    <label for="split-option">Split Option Text:</label>
-                    <input type="text" id="split-option" value="Split 50/50" onchange="updatePersonNames()">
-                </div>
+            <div id="people-config-list">
+                <!-- People config list will be dynamically populated -->
             </div>
         </div>
         
@@ -312,9 +326,13 @@
         </div>
         
         <div class="tax-section">
-            <div class="tax-input">
+            <div class="amount-input">
                 <label for="tax-amount">Total Tax Amount: $</label>
-                <input type="number" id="tax-amount" step="0.01" placeholder="0.00" onchange="calculateSummary()">
+                <input type="number" id="tax-amount" step="0.01" placeholder="0.00" oninput="calculateSummary()">
+            </div>
+            <div class="amount-input">
+                <label for="tip-amount">Total Tip Amount: $</label>
+                <input type="number" id="tip-amount" step="0.01" placeholder="0.00" oninput="calculateSummary()">
             </div>
         </div>
         
@@ -328,6 +346,10 @@
                 <div class="summary-row">
                     <span>Tax Share:</span>
                     <span id="person1-tax">$0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tip Share:</span>
+                    <span id="person1-tip">$0.00</span>
                 </div>
                 <div class="summary-row total">
                     <span>Total:</span>
@@ -344,6 +366,10 @@
                 <div class="summary-row">
                     <span>Tax Share:</span>
                     <span id="person2-tax">$0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tip Share:</span>
+                    <span id="person2-tip">$0.00</span>
                 </div>
                 <div class="summary-row total">
                     <span>Total:</span>
@@ -377,54 +403,153 @@
 
     <script>
         // Configuration variables
-        let person1Name = "Person 1";
-        let person2Name = "Person 2";
-        let splitOption = "Split 50/50";
+        let people = [
+            { id: crypto.randomUUID ? crypto.randomUUID() : 'p1', name: 'Person 1' },
+            { id: crypto.randomUUID ? crypto.randomUUID() : 'p2', name: 'Person 2' }
+        ];
         
         function updatePersonNames() {
-            person1Name = document.getElementById('person1-name').value || "Person 1";
-            person2Name = document.getElementById('person2-name').value || "Person 2";
-            splitOption = document.getElementById('split-option').value || "Split 50/50";
-            
+            // Preserve all current custom split values for each row and person id
+            const customSplitPreserve = [];
+            document.querySelectorAll('.input-row').forEach((row, rowIdx) => {
+                const payerSelect = row.querySelector('.item-payer');
+                if (payerSelect && payerSelect.value === 'Custom') {
+                    const customCell = row.querySelector('.custom-split-cell');
+                    if (customCell) {
+                        const oldInputs = customCell.querySelectorAll('.custom-split-person');
+                        const oldValues = {};
+                        oldInputs.forEach(inp => {
+                            oldValues[inp.getAttribute('data-person-id')] = inp.value;
+                        });
+                        let typeSel = customCell.querySelector('.custom-split-type');
+                        let typeValue = typeSel ? typeSel.value : 'percent';
+                        customSplitPreserve[rowIdx] = { oldValues, typeValue };
+                    }
+                }
+            });
+
+            // Update people array from config inputs
+            const personInputs = document.querySelectorAll('[id^="person-"][id$="-name"]');
+            people.forEach((p, i) => {
+                p.name = personInputs[i] ? personInputs[i].value || personInputs[i].placeholder || "Person" : p.name;
+            });
+
+            // Show/hide delete buttons
+            const deleteBtns = document.querySelectorAll('.delete-person-btn');
+            if (people.length > 2) {
+                deleteBtns.forEach(btn => btn.style.display = 'inline-block');
+            } else {
+                deleteBtns.forEach(btn => btn.style.display = 'none');
+            }
+
             // Update summary titles
-            document.getElementById('person1-title').textContent = person1Name;
-            document.getElementById('person2-title').textContent = person2Name;
-            
-            // Update all select options
+            people.forEach((p, idx) => {
+                const title = document.getElementById(`person${idx+1}-title`);
+                if (title) title.textContent = p.name;
+            });
+
+            // Update all select options, preserving selection by value only
             const selectElements = document.querySelectorAll('.item-payer');
             selectElements.forEach(select => {
-                const currentValue = select.value;
-                select.innerHTML = `
-                    <option value="${person1Name}">${person1Name}</option>
-                    <option value="${person2Name}">${person2Name}</option>
-                    <option value="Split">${splitOption}</option>
-                    <option value="Custom">Custom Split</option>
-                `;
-                select.value = currentValue;
+                const prevValue = select.value;
+                let optionsHtml = people.map((p, idx) => `<option value="${p.id}">${p.name}</option>`).join('');
+                optionsHtml += `<option value="Split">Split Evenly</option><option value="Custom">Custom Split</option>`;
+                select.innerHTML = optionsHtml;
+                // Try to restore by value, fallback to error state if not found
+                if ([...people.map(p => p.id), 'Split', 'Custom'].includes(prevValue)) {
+                    select.value = prevValue;
+                    select.style.borderColor = '#ddd';
+                } else {
+                    select.selectedIndex = -1;
+                    select.style.borderColor = 'red';
+                }
             });
-            
+
+            // For all rows with Custom Split, update the custom split UI and validation, preserving values for existing people
+            document.querySelectorAll('.input-row').forEach((row, rowIdx) => {
+                const payerSelect = row.querySelector('.item-payer');
+                if (payerSelect && payerSelect.value === 'Custom') {
+                    const customCell = row.querySelector('.custom-split-cell');
+                    // Use preserved values if available
+                    let oldValues = {}, typeValue = 'percent';
+                    if (customSplitPreserve[rowIdx]) {
+                        oldValues = customSplitPreserve[rowIdx].oldValues;
+                        typeValue = customSplitPreserve[rowIdx].typeValue;
+                    }
+                    // Rebuild the custom split UI for all people
+                    let customInputsHtml = people.map((p, idx) =>
+                        `<input type="number" class="custom-split-person" data-person-idx="${idx}" data-person-id="${p.id}" placeholder="${p.name} % or $" min="0" style="width:${Math.max(100/people.length-2,20)}%; display:inline-block; margin-right:2px;" onchange="calculateSummary()" oninput="validateCustomSplit(this)" value="${oldValues[p.id] || ''}">`
+                    ).join('');
+                    customInputsHtml += `<select class="custom-split-type" style="width:100%; margin-top:2px;" onchange="calculateSummary(); validateCustomSplit(this)">
+                        <option value="percent"${typeValue==='percent'?' selected':''}>%</option>
+                        <option value="dollar"${typeValue==='dollar'?' selected':''}>$</option>
+                    </select>`;
+                    if (customCell) customCell.innerHTML = customInputsHtml;
+                    // Validate all custom split inputs in this row
+                    const customInputs = row.querySelectorAll('.custom-split-person');
+                    customInputs.forEach(input => validateCustomSplit(input));
+                }
+            });
+
             calculateSummary();
+        }
+        
+        function addPerson() {
+            people.push({ id: generatePersonId(), name: `Person ${people.length + 1}` });
+            rebuildPeopleConfigList();
+            updatePersonNames();
+        }
+        
+        function deletePerson(idx) {
+            if (people.length <= 2) return; // Always keep at least 2 people
+            people.splice(idx, 1);
+            rebuildPeopleConfigList();
+            updatePersonNames();
+        }
+        
+        function rebuildPeopleConfigList() {
+            const peopleConfigList = document.getElementById('people-config-list');
+            peopleConfigList.innerHTML = '';
+            for (let i = 0; i < people.length; i += 2) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'config-row';
+                for (let j = 0; j < 2 && (i + j) < people.length; j++) {
+                    const idx = i + j;
+                    const inputDiv = document.createElement('div');
+                    inputDiv.className = 'config-input';
+                    inputDiv.innerHTML = `
+                        <div class="person-config-flex">
+                            <label for="person-${idx}-name">Person ${idx+1} Name:</label>
+                            <input type="text" id="person-${idx}-name" value="${people[idx].name}" onchange="updatePersonNames()">
+                            <button type="button" class="delete-person-btn" style="${people.length > 2 ? '' : 'display:none'}; margin-left:8px;" onclick="deletePerson(${idx})">Delete</button>
+                        </div>
+                    `;
+                    rowDiv.appendChild(inputDiv);
+                }
+                peopleConfigList.appendChild(rowDiv);
+            }
         }
         
         function addItem() {
             const container = document.getElementById('items-container');
             const newRow = document.createElement('tr');
             newRow.className = 'input-row';
+            // Generate options for all people
+            let optionsHtml = people.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            optionsHtml += `<option value="Split">Split Evenly</option><option value="Custom">Custom Split</option>`;
             newRow.innerHTML = `
                 <td><input type="text" placeholder="Enter item name" class="item-name"></td>
-                <td><input type="number" step="0.01" placeholder="0.00" class="item-cost" onchange="calculateSummary()"></td>
+                <td><input type="number" step="0.01" placeholder="0.00" class="item-cost" oninput="calculateSummary()"></td>
                 <td>
-                    <select class="item-payer" onchange="handlePayerChange(this); calculateSummary(); validateCustomSplit(this)">
-                        <option value="${person1Name}">${person1Name}</option>
-                        <option value="${person2Name}">${person2Name}</option>
-                        <option value="Split">${splitOption}</option>
-                        <option value="Custom">Custom Split</option>
+                    <select class="item-payer" onchange="handlePayerChange(this); calculateSummary(); validateCustomSplit(this)" oninput="resetPayerBorder(this)">
+                        ${optionsHtml}
                     </select>
                 </td>
                 <td class="custom-split-cell"></td>
                 <td><button onclick="removeItem(this)">Remove</button></td>
             `;
             container.appendChild(newRow);
+            addEnterKeyListener(newRow);
         }
         
         function removeItem(button) {
@@ -440,231 +565,287 @@
         }
 
         function calculateSummary() {
-            let person1Subtotal = 0;
-            let person2Subtotal = 0;
-            
+            // Initialize subtotals for each person
+            let subtotals = people.map(() => 0);
             const items = document.querySelectorAll('.input-row');
             items.forEach(item => {
                 const cost = parseFloat(item.querySelector('.item-cost').value) || 0;
                 const payer = item.querySelector('.item-payer').value;
-                
-                if (payer === person1Name) {
-                    person1Subtotal += cost;
-                } else if (payer === person2Name) {
-                    person2Subtotal += cost;
+                if (people.find(p => p.id === payer)) {
+                    // Assign full cost to selected person
+                    const idx = people.findIndex(p => p.id === payer);
+                    subtotals[idx] += cost;
                 } else if (payer === 'Split') {
-                    const [p1Share, p2Share] = splitAmount(cost);
-                    person1Subtotal += p1Share;
-                    person2Subtotal += p2Share;
+                    // Split evenly among all people
+                    const evenShare = Math.floor((cost / people.length) * 100) / 100;
+                    let distributed = evenShare * people.length;
+                    let remainder = Math.round((cost - distributed) * 100) / 100;
+                    for (let i = 0; i < people.length; i++) {
+                        subtotals[i] += evenShare;
+                    }
+                    // Assign remainder to the last person
+                    if (remainder !== 0) {
+                        subtotals[people.length - 1] += remainder;
+                    }
                 } else if (payer === 'Custom') {
                     const row = item;
                     const customCell = row.querySelector('.custom-split-cell');
                     if (customCell) {
                         const typeSel = customCell.querySelector('.custom-split-type');
-                        const p1Input = customCell.querySelector('.custom-split-person1');
-                        const p2Input = customCell.querySelector('.custom-split-person2');
-                        if (typeSel && p1Input && p2Input) {
+                        const customInputs = customCell.querySelectorAll('input');
+                        if (typeSel && customInputs.length === people.length) {
                             const type = typeSel.value;
-                            let p1Share = parseFloat(p1Input.value) || 0;
-                            let p2Share = parseFloat(p2Input.value) || 0;
+                            let shares = Array.from(customInputs).map(input => parseFloat(input.value) || 0);
                             if (type === 'percent') {
-                                p1Share = cost * (p1Share / 100);
-                                p2Share = cost * (p2Share / 100);
-                                // Only count if sum is 100%
-                                if (Math.abs((parseFloat(p1Input.value)||0) + (parseFloat(p2Input.value)||0) - 100) == 0.00) {
-                                    person1Subtotal += p1Share;
-                                    person2Subtotal += p2Share;
+                                const percentSum = shares.reduce((a, b) => a + b, 0);
+                                if (Math.abs(percentSum - 100) < 0.01) {
+                                    for (let i = 0; i < people.length; i++) {
+                                        subtotals[i] += cost * (shares[i] / 100);
+                                    }
                                 }
                             } else if (type === 'dollar') {
-                                // Only count if sum is cost
-                                if (Math.abs((p1Share + p2Share) - cost) == 0.00) {
-                                    person1Subtotal += p1Share;
-                                    person2Subtotal += p2Share;
+                                const dollarSum = shares.reduce((a, b) => a + b, 0);
+                                if (Math.abs(dollarSum - cost) < 0.01) {
+                                    for (let i = 0; i < people.length; i++) {
+                                        subtotals[i] += shares[i];
+                                    }
                                 }
                             }
                         }
                     }
                 }
             });
-            
-            // Round subtotals to 2 decimals to avoid floating point issues
-            person1Subtotal = Math.round(person1Subtotal * 100) / 100;
-            person2Subtotal = Math.round(person2Subtotal * 100) / 100;
-            
-            const totalSubtotal = person1Subtotal + person2Subtotal;
+            // Round subtotals
+            subtotals = subtotals.map(x => Math.round(x * 100) / 100);
+            const totalSubtotal = subtotals.reduce((a, b) => a + b, 0);
             const taxAmount = parseFloat(document.getElementById('tax-amount').value) || 0;
-            
-            // Calculate tax share based on subtotal ratio, with correct rounding
-            let person1TaxShare = 0;
-            let person2TaxShare = 0;
+            const tipAmount = parseFloat(document.getElementById('tip-amount').value) || 0;
+            // Calculate tax shares
+            let taxShares = people.map(() => 0);
+            let tipShares = people.map(() => 0);
             if (totalSubtotal > 0) {
-                const p1Raw = (person1Subtotal / totalSubtotal) * taxAmount;
-                person1TaxShare = Math.round(p1Raw * 100) / 100;
-                person2TaxShare = Math.round((taxAmount - person1TaxShare) * 100) / 100;
+                let distributed = 0;
+                for (let i = 0; i < people.length - 1; i++) {
+                    taxShares[i] = Math.round((subtotals[i] / totalSubtotal * taxAmount) * 100) / 100;
+                    distributed += taxShares[i];
+                }
+                taxShares[people.length - 1] = Math.round((taxAmount - distributed) * 100) / 100;
             }
-            
-            // Update display
-            document.getElementById('person1-subtotal').textContent = '$' + person1Subtotal.toFixed(2);
-            document.getElementById('person1-tax').textContent = '$' + person1TaxShare.toFixed(2);
-            document.getElementById('person1-total').textContent = '$' + (person1Subtotal + person1TaxShare).toFixed(2);
-            
-            document.getElementById('person2-subtotal').textContent = '$' + person2Subtotal.toFixed(2);
-            document.getElementById('person2-tax').textContent = '$' + person2TaxShare.toFixed(2);
-            document.getElementById('person2-total').textContent = '$' + (person2Subtotal + person2TaxShare).toFixed(2);
-            
+            if (totalSubtotal > 0) {
+                let distributed = 0;
+                for (let i = 0; i < people.length - 1; i++) {
+                    tipShares[i] = Math.round((subtotals[i] / totalSubtotal * tipAmount) * 100) / 100;
+                    distributed += tipShares[i];
+                }
+                tipShares[people.length - 1] = Math.round((tipAmount - distributed) * 100) / 100;
+            }
+            // Update summary section
+            const summaryDiv = document.querySelector('.summary');
+            summaryDiv.innerHTML = people.map((p, idx) => `
+                <div class="person-summary">
+                    <h3 id="person${idx+1}-title">${p.name}</h3>
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span id="person${idx+1}-subtotal">$${subtotals[idx].toFixed(2)}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tax Share:</span>
+                        <span id="person${idx+1}-tax">$${taxShares[idx].toFixed(2)}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tip Share:</span>
+                        <span id="person${idx+1}-tip">$${tipShares[idx].toFixed(2)}</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total:</span>
+                        <span id="person${idx+1}-total">$${(subtotals[idx] + taxShares[idx] + tipShares[idx]).toFixed(2)}</span>
+                    </div>
+                </div>
+            `).join('');
             // Update running total
-            updateRunningTotal();
+            updateRunningTotal(subtotals, taxShares, tipShares);
         }
         
-        function updateRunningTotal() {
+        function updateRunningTotal(subtotals, taxShares, tipShares) {
             const container = document.getElementById('running-total-container');
             container.innerHTML = '';
-            
             const items = document.querySelectorAll('.input-row');
             let totalCost = 0;
-            
             items.forEach(item => {
                 const name = item.querySelector('.item-name').value || 'Unnamed Item';
                 const cost = parseFloat(item.querySelector('.item-cost').value) || 0;
                 const payer = item.querySelector('.item-payer').value;
-                let person1Share = 0;
-                let person2Share = 0;
+                let shares = people.map(() => 0);
                 let shareText = '';
+                let payerDisplay = payer;
                 if (cost > 0) {
                     totalCost += cost;
-                    if (payer === person1Name) {
-                        person1Share = cost;
-                        shareText = `${person1Name}: $${person1Share.toFixed(2)} | ${person2Name}: $0.00`;
-                    } else if (payer === person2Name) {
-                        person2Share = cost;
-                        shareText = `${person1Name}: $0.00 | ${person2Name}: $${person2Share.toFixed(2)}`;
+                    if (people.find(p => p.id === payer)) {
+                        shares[people.findIndex(p => p.id === payer)] = cost;
+                        payerDisplay = people.find(p => p.id === payer).name;
                     } else if (payer === 'Split') {
-                        [person1Share, person2Share] = splitAmount(cost);
-                        shareText = `${person1Name}: $${person1Share.toFixed(2)} | ${person2Name}: $${person2Share.toFixed(2)}`;
+                        const evenShare = Math.floor((cost / people.length) * 100) / 100;
+                        let distributed = evenShare * people.length;
+                        let remainder = Math.round((cost - distributed) * 100) / 100;
+                        for (let i = 0; i < people.length; i++) {
+                            shares[i] = evenShare;
+                        }
+                        if (remainder !== 0) {
+                            shares[people.length - 1] += remainder;
+                        }
+                        payerDisplay = 'Split Evenly';
                     } else if (payer === 'Custom') {
                         const row = item;
                         const customCell = row.querySelector('.custom-split-cell');
                         if (customCell) {
                             const typeSel = customCell.querySelector('.custom-split-type');
-                            const p1Input = customCell.querySelector('.custom-split-person1');
-                            const p2Input = customCell.querySelector('.custom-split-person2');
-                            if (typeSel && p1Input && p2Input) {
+                            const customInputs = customCell.querySelectorAll('input');
+                            if (typeSel && customInputs.length === people.length) {
                                 const type = typeSel.value;
-                                let p1ShareVal = parseFloat(p1Input.value) || 0;
-                                let p2ShareVal = parseFloat(p2Input.value) || 0;
+                                let inputVals = Array.from(customInputs).map(input => parseFloat(input.value) || 0);
                                 if (type === 'percent') {
-                                    person1Share = cost * (p1ShareVal / 100);
-                                    person2Share = cost * (p2ShareVal / 100);
-                                    if (Math.abs((p1ShareVal + p2ShareVal) - 100) < 0.01) {
-                                        shareText = `${person1Name}: $${person1Share.toFixed(2)} | ${person2Name}: $${person2Share.toFixed(2)}`;
-                                    } else {
-                                        person1Share = 0; person2Share = 0;
-                                        shareText = `<span style='color:red'>Invalid %</span>`;
+                                    const percentSum = inputVals.reduce((a, b) => a + b, 0);
+                                    if (Math.abs(percentSum - 100) < 0.01) {
+                                        for (let i = 0; i < people.length; i++) {
+                                            shares[i] = cost * (inputVals[i] / 100);
+                                        }
                                     }
                                 } else if (type === 'dollar') {
-                                    person1Share = p1ShareVal;
-                                    person2Share = p2ShareVal;
-                                    if (Math.abs((person1Share + person2Share) - cost) < 0.01) {
-                                        shareText = `${person1Name}: $${person1Share.toFixed(2)} | ${person2Name}: $${person2Share.toFixed(2)}`;
-                                    } else {
-                                        person1Share = 0; person2Share = 0;
-                                        shareText = `<span style='color:red'>Invalid $</span>`;
+                                    const dollarSum = inputVals.reduce((a, b) => a + b, 0);
+                                    if (Math.abs(dollarSum - cost) < 0.01) {
+                                        for (let i = 0; i < people.length; i++) {
+                                            shares[i] = inputVals[i];
+                                        }
                                     }
                                 }
                             }
                         }
+                        payerDisplay = 'Custom Split';
                     }
-                    
+                    shareText = people.map((p, idx) => `${p.name}: $${shares[idx].toFixed(2)}`).join('<br/>');
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class="item-name">${name}</td>
                         <td class="item-cost">$${cost.toFixed(2)}</td>
-                        <td class="item-payer">${payer}</td>
+                        <td class="item-payer">${payerDisplay}</td>
                         <td class="item-share">${shareText}</td>
                     `;
                     container.appendChild(row);
                 }
             });
-            
             // Add tax row if there's tax
             const taxAmount = parseFloat(document.getElementById('tax-amount').value) || 0;
             if (taxAmount > 0) {
-                const person1Subtotal = parseFloat(document.getElementById('person1-subtotal').textContent.replace('$', ''));
-                const person2Subtotal = parseFloat(document.getElementById('person2-subtotal').textContent.replace('$', ''));
-                const totalSubtotal = person1Subtotal + person2Subtotal;
-                
-                let person1TaxShare = 0;
-                let person2TaxShare = 0;
-                if (totalSubtotal > 0) {
-                    const p1Raw = (person1Subtotal / totalSubtotal) * taxAmount;
-                    person1TaxShare = Math.round(p1Raw * 100) / 100;
-                    person2TaxShare = Math.round((taxAmount - person1TaxShare) * 100) / 100;
-                }
-                
+                const totalSubtotal = subtotals.reduce((a, b) => a + b, 0);
+                let taxShareText = people.map((p, idx) => `${p.name}: $${taxShares[idx].toFixed(2)}`).join('<br/>');
                 const taxRow = document.createElement('tr');
                 taxRow.innerHTML = `
                     <td class="item-name">Tax</td>
                     <td class="item-cost">$${taxAmount.toFixed(2)}</td>
                     <td class="item-payer">Split by ratio</td>
-                    <td class="item-share">${person1Name}: $${person1TaxShare.toFixed(2)} | ${person2Name}: $${person2TaxShare.toFixed(2)}</td>
+                    <td class="item-share">${taxShareText}</td>
                 `;
                 container.appendChild(taxRow);
             }
-            
+            // Add tip row if there's tip
+            const tipAmount = parseFloat(document.getElementById('tip-amount').value) || 0;
+            if (tipAmount > 0) {
+                const totalSubtotal = subtotals.reduce((a, b) => a + b, 0);
+                let tipShareText = people.map((p, idx) => `${p.name}: $${tipShares[idx].toFixed(2)}`).join('<br/>');
+                const tipRow = document.createElement('tr');
+                tipRow.innerHTML = `
+                    <td class="item-name">Tip</td>
+                    <td class="item-cost">$${tipAmount.toFixed(2)}</td>
+                    <td class="item-payer">Split by ratio</td>
+                    <td class="item-share">${tipShareText}</td>
+                `;
+                container.appendChild(tipRow);
+            }
             // Add total row
-            const person1Total = parseFloat(document.getElementById('person1-total').textContent.replace('$', ''));
-            const person2Total = parseFloat(document.getElementById('person2-total').textContent.replace('$', ''));
-            const grandTotal = person1Total + person2Total;
-            
+            const totals = subtotals.map((s, i) => s + taxShares[i] + tipShares[i]);
+            const grandTotal = totals.reduce((a, b) => a + b, 0);
+            const totalText = people.map((p, idx) => `${p.name}: $${totals[idx].toFixed(2)}`).join('<br/>');
             const totalRow = document.createElement('tr');
             totalRow.innerHTML = `
                 <td class="item-name">TOTAL</td>
                 <td class="item-cost">$${grandTotal.toFixed(2)}</td>
                 <td class="item-payer"></td>
-                <td class="item-share">${person1Name}: $${person1Total.toFixed(2)} | ${person2Name}: $${person2Total.toFixed(2)}</td>
+                <td class="item-share">${totalText}</td>
             `;
             container.appendChild(totalRow);
         }
         
         function exportToCSV() {
-            let csv = `Item,Cost,Expense To,${person1Name} Share,${person2Name} Share\n`;
-            
+            let csv = `Item,Cost,Expense To,${people.map(p => p.name + ' Share').join(',')}` + '\n';
             const items = document.querySelectorAll('.input-row');
             items.forEach(item => {
                 const name = item.querySelector('.item-name').value || 'Unnamed Item';
                 const cost = parseFloat(item.querySelector('.item-cost').value) || 0;
                 const payer = item.querySelector('.item-payer').value;
-                
-                let person1Share = 0;
-                let person2Share = 0;
-                
-                if (payer === person1Name) {
-                    person1Share = cost;
-                } else if (payer === person2Name) {
-                    person2Share = cost;
+                let shares = people.map(() => 0);
+                if (people.find(p => p.id === payer)) {
+                    shares[people.findIndex(p => p.id === payer)] = cost;
                 } else if (payer === 'Split') {
-                    person1Share = cost / 2;
-                    person2Share = cost / 2;
+                    const evenShare = Math.floor((cost / people.length) * 100) / 100;
+                    let distributed = evenShare * people.length;
+                    let remainder = Math.round((cost - distributed) * 100) / 100;
+                    for (let i = 0; i < people.length; i++) shares[i] = evenShare;
+                    if (remainder !== 0) shares[people.length - 1] += remainder;
+                } else if (payer === 'Custom') {
+                    const row = item;
+                    const customCell = row.querySelector('.custom-split-cell');
+                    if (customCell) {
+                        const typeSel = customCell.querySelector('.custom-split-type');
+                        const customInputs = customCell.querySelectorAll('input');
+                        if (typeSel && customInputs.length === people.length) {
+                            const type = typeSel.value;
+                            let vals = Array.from(customInputs).map(inp => parseFloat(inp.value) || 0);
+                            if (type === 'percent') {
+                                const percentSum = vals.reduce((a, b) => a + b, 0);
+                                if (Math.abs(percentSum - 100) < 0.01) {
+                                    for (let i = 0; i < people.length; i++) shares[i] = cost * (vals[i] / 100);
+                                }
+                            } else if (type === 'dollar') {
+                                const dollarSum = vals.reduce((a, b) => a + b, 0);
+                                if (Math.abs(dollarSum - cost) < 0.01) {
+                                    for (let i = 0; i < people.length; i++) shares[i] = vals[i];
+                                }
+                            }
+                        }
+                    }
                 }
-                
-                csv += `"${name}",${cost.toFixed(2)},"${payer}",${person1Share.toFixed(2)},${person2Share.toFixed(2)}\n`;
+                csv += `"${name}",${cost.toFixed(2)},"${people.find(p => p.id === payer)?.name || payer}",${shares.map(s => s.toFixed(2)).join(',')}` + '\n';
             });
-            
             // Add tax row
             const taxAmount = parseFloat(document.getElementById('tax-amount').value) || 0;
-            const person1Subtotal = parseFloat(document.getElementById('person1-subtotal').textContent.replace('$', ''));
-            const person2Subtotal = parseFloat(document.getElementById('person2-subtotal').textContent.replace('$', ''));
-            const totalSubtotal = person1Subtotal + person2Subtotal;
-            
-            const person1TaxShare = totalSubtotal > 0 ? (person1Subtotal / totalSubtotal) * taxAmount : 0;
-            const person2TaxShare = totalSubtotal > 0 ? (person2Subtotal / totalSubtotal) * taxAmount : 0;
-            
-            csv += `"Tax",${taxAmount.toFixed(2)},"Split by ratio",${person1TaxShare.toFixed(2)},${person2TaxShare.toFixed(2)}\n`;
-            
+            const subtotals = people.map((_, idx) => parseFloat(document.getElementById(`person${idx+1}-subtotal`)?.textContent?.replace('$', '') || 0));
+            const totalSubtotal = subtotals.reduce((a, b) => a + b, 0);
+            let taxShares = people.map(() => 0);
+            if (totalSubtotal > 0) {
+                let distributed = 0;
+                for (let i = 0; i < people.length - 1; i++) {
+                    taxShares[i] = Math.round((subtotals[i] / totalSubtotal * taxAmount) * 100) / 100;
+                    distributed += taxShares[i];
+                }
+                taxShares[people.length - 1] = Math.round((taxAmount - distributed) * 100) / 100;
+            }
+            csv += `"Tax",${taxAmount.toFixed(2)},"Split by ratio",${taxShares.map(s => s.toFixed(2)).join(',')}` + '\n';
+            // Add tip row
+            const tipAmount = parseFloat(document.getElementById('tip-amount').value) || 0;
+            let tipShares = people.map(() => 0);
+            if (totalSubtotal > 0) {
+                let distributed = 0;
+                for (let i = 0; i < people.length - 1; i++) {
+                    tipShares[i] = Math.round((subtotals[i] / totalSubtotal * tipAmount) * 100) / 100;
+                    distributed += tipShares[i];
+                }
+                tipShares[people.length - 1] = Math.round((tipAmount - distributed) * 100) / 100;
+            }
+            csv += `"Tip",${tipAmount.toFixed(2)},"Split by ratio",${tipShares.map(s => s.toFixed(2)).join(',')}` + '\n';
             // Add totals
             csv += '\n';
-            csv += `"TOTALS",,,"${document.getElementById('person1-total').textContent}","${document.getElementById('person2-total').textContent}"\n`;
-            
+            const totals = people.map((_, idx) => parseFloat(document.getElementById(`person${idx+1}-total`)?.textContent?.replace('$', '') || 0));
+            csv += `"TOTALS",,,${totals.map(t => '"$' + t.toFixed(2) + '"').join(',')}` + '\n';
             // Download CSV
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
@@ -674,19 +855,6 @@
             a.click();
             window.URL.revokeObjectURL(url);
         }
-        
-        // Initialize the configuration
-        updatePersonNames();
-        
-        // Add the first item row automatically
-        addItem();
-        
-        // Initial calculation
-        calculateSummary();
-        
-        // Add event listeners to initial row
-        // document.querySelector('.item-cost').addEventListener('change', calculateSummary);
-        // document.querySelector('.item-payer').addEventListener('change', calculateSummary);
         
         // Enable Enter key to add another item
         function addEnterKeyListener(row) {
@@ -707,29 +875,22 @@
                 });
             });
         }
-        // Add to initial row
-        addEnterKeyListener(document.querySelector('.input-row'));
-        
-        // Patch addItem to add Enter key listener to new rows
-        const originalAddItem = addItem;
-        addItem = function() {
-            originalAddItem();
-            const allRows = document.querySelectorAll('.input-row');
-            addEnterKeyListener(allRows[allRows.length - 1]);
-        };
 
         function handlePayerChange(select) {
             const row = select.closest('tr');
             const customCell = row.querySelector('.custom-split-cell');
             if (select.value === 'Custom') {
-                customCell.innerHTML = `
-                    <input type="number" class="custom-split-person1" placeholder="${person1Name} % or $" min="0" style="width:48%; display:inline-block;" onchange="calculateSummary()" oninput="validateCustomSplit(this)"> <span style="font-weight:bold;">/</span> 
-                    <input type="number" class="custom-split-person2" placeholder="${person2Name} % or $" min="0" style="width:48%; display:inline-block;" onchange="calculateSummary()" oninput="validateCustomSplit(this)">
-                    <select class="custom-split-type" style="width:100%; margin-top:2px;" onchange="calculateSummary(); validateCustomSplit(this)">
-                        <option value="percent">%</option>
-                        <option value="dollar">$</option>
-                    </select>
-                `;
+                // Generate custom split inputs for all people
+                let customInputsHtml = people.map((p, idx) =>
+                    `<input type="number" class="custom-split-person" data-person-idx="${idx}" data-person-id="${p.id}" placeholder="${p.name} % or $" min="0" style="width:${Math.max(100/people.length-2,20)}%; display:inline-block; margin-right:2px;" onchange="calculateSummary()" oninput="validateCustomSplit(this)">`
+                ).join('');
+                customInputsHtml += `<select class="custom-split-type" style="width:100%; margin-top:2px;" onchange="calculateSummary(); validateCustomSplit(this)">
+                    <option value="percent">%</option>
+                    <option value="dollar">$</option>
+                </select>`;
+                customCell.innerHTML = customInputsHtml;
+                // Immediately call updatePersonNames to capture the new state for preservation
+                updatePersonNames();
             } else {
                 customCell.innerHTML = '';
             }
@@ -739,32 +900,40 @@
             const row = input.closest('tr');
             const customCell = row.querySelector('.custom-split-cell');
             const typeSel = customCell.querySelector('.custom-split-type');
-            const p1Input = customCell.querySelector('.custom-split-person1');
-            const p2Input = customCell.querySelector('.custom-split-person2');
+            const customInputs = customCell.querySelectorAll('.custom-split-person');
             const cost = parseFloat(row.querySelector('.item-cost').value) || 0;
-            
-            if (typeSel && p1Input && p2Input && cost > 0) {
+            if (typeSel && customInputs.length === people.length && cost > 0) {
                 const type = typeSel.value;
-                let p1ShareVal = parseFloat(p1Input.value) || 0;
-                let p2ShareVal = parseFloat(p2Input.value) || 0;
-                
+                let values = Array.from(customInputs).map(inp => parseFloat(inp.value) || 0);
                 let isValid = false;
                 if (type === 'percent') {
-                    isValid = Math.abs((p1ShareVal + p2ShareVal) - 100) < 0.01;
+                    isValid = Math.abs(values.reduce((a, b) => a + b, 0) - 100) < 0.01;
                 } else if (type === 'dollar') {
-                    isValid = Math.abs((p1ShareVal + p2ShareVal) - cost) < 0.01;
+                    isValid = Math.abs(values.reduce((a, b) => a + b, 0) - cost) < 0.01;
                 }
-                
-                // Update border colors based on validation
-                if (isValid) {
-                    p1Input.style.borderColor = '#ddd';
-                    p2Input.style.borderColor = '#ddd';
-                } else {
-                    p1Input.style.borderColor = 'red';
-                    p2Input.style.borderColor = 'red';
-                }
+                customInputs.forEach(inp => {
+                    inp.style.borderColor = isValid ? '#ddd' : 'red';
+                });
             }
         }
+
+        function resetPayerBorder(select) {
+            select.style.borderColor = '#ddd';
+        }
+
+        function generatePersonId() {
+            return (window.crypto && window.crypto.getRandomValues)
+                ? ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                    (c ^ window.crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16))
+                : 'p' + Date.now() + Math.floor(Math.random()*10000);
+        }
+
+        // On page load, set people array to the values of the first two inputs if present
+        window.addEventListener('DOMContentLoaded', () => {
+            rebuildPeopleConfigList(); // Build the people config list from the initial people array
+            updatePersonNames(); // Doesn't do much unless there are more than 2 people on initial load
+            addItem(); // Add a single item row on initialization
+        });
     </script>
 </body>
 </html>
