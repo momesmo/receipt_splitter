@@ -34,6 +34,14 @@
             border-radius: 8px;
             margin-bottom: 20px;
             border-left: 4px solid #2196f3;
+            position: relative;
+        }
+
+        .config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
         }
         
         .config-section h3 {
@@ -158,19 +166,25 @@
             padding: 15px;
             border-radius: 8px;
             margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            align-items: center;
+            justify-content: center;
         }
         
-        .tax-input {
+        .amount-input {
             display: flex;
             align-items: center;
             gap: 10px;
+            margin-bottom: 0;
         }
         
-        .tax-input label {
+        .amount-input label {
             font-weight: bold;
         }
         
-        .tax-input input {
+        .amount-input input {
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -241,17 +255,17 @@
             margin-top: 0;
             color: #856404;
         }
-        
-        .input-table th:nth-child(1),
-        .running-total-table th:nth-child(1) { width: 30%; }
-        .input-table th:nth-child(2),
-        .running-total-table th:nth-child(2) { width: 10%; }
-        .input-table th:nth-child(3),
-        .running-total-table th:nth-child(3) { width: 25%; }
-        .input-table th:nth-child(4),
-        .running-total-table th:nth-child(4) { width: 25%; }
-        .input-table th:nth-child(5),
-        .running-total-table th:nth-child(4) { width: 10%; }
+
+        .running-total-table th:nth-child(1) { width: 25%; } /* Item Description */
+        .running-total-table th:nth-child(2) { width: 25%; } /* Cost ($) */
+        .running-total-table th:nth-child(3) { width: 25%; } /* Expense To */
+        .running-total-table th:nth-child(4) { width: 25%; } /* Share */
+
+        .input-table th:nth-child(1) { width: 25%; } /* Item Description */
+        .input-table th:nth-child(2) { width: 15%; } /* Cost ($) */
+        .input-table th:nth-child(3) { width: 20%; } /* Expense To */
+        .input-table th:nth-child(4) { width: 30%; } /* Custom Split */
+        .input-table th:nth-child(5) { width: 10%; } /* Action */
         
         .input-table input, .input-table select {
             width: 100%;
@@ -284,11 +298,13 @@
         <h1>Grocery Receipt Cost Splitter</h1>
         
         <div class="config-section">
-            <h3>Configuration</h3>
+            <div class="config-header">
+                <h3>Configuration</h3>
+                <button id="add-person-btn" type="button" onclick="addPerson()">+ Add Person</button>
+            </div>
             <div id="people-config-list">
                 <!-- People config list will be dynamically populated -->
             </div>
-            <button id="add-person-btn" type="button" onclick="addPerson()">+ Add Person</button>
         </div>
         
         <div class="input-section">
@@ -311,9 +327,13 @@
         </div>
         
         <div class="tax-section">
-            <div class="tax-input">
+            <div class="amount-input">
                 <label for="tax-amount">Total Tax Amount: $</label>
-                <input type="number" id="tax-amount" step="0.01" placeholder="0.00" onchange="calculateSummary()">
+                <input type="number" id="tax-amount" step="0.01" placeholder="0.00" oninput="calculateSummary()">
+            </div>
+            <div class="amount-input">
+                <label for="tip-amount">Total Tip Amount: $</label>
+                <input type="number" id="tip-amount" step="0.01" placeholder="0.00" oninput="calculateSummary()">
             </div>
         </div>
         
@@ -327,6 +347,10 @@
                 <div class="summary-row">
                     <span>Tax Share:</span>
                     <span id="person1-tax">$0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tip Share:</span>
+                    <span id="person1-tip">$0.00</span>
                 </div>
                 <div class="summary-row total">
                     <span>Total:</span>
@@ -343,6 +367,10 @@
                 <div class="summary-row">
                     <span>Tax Share:</span>
                     <span id="person2-tax">$0.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tip Share:</span>
+                    <span id="person2-tip">$0.00</span>
                 </div>
                 <div class="summary-row total">
                     <span>Total:</span>
@@ -382,6 +410,25 @@
         ];
         
         function updatePersonNames() {
+            // Preserve all current custom split values for each row and person id
+            const customSplitPreserve = [];
+            document.querySelectorAll('.input-row').forEach((row, rowIdx) => {
+                const payerSelect = row.querySelector('.item-payer');
+                if (payerSelect && payerSelect.value === 'Custom') {
+                    const customCell = row.querySelector('.custom-split-cell');
+                    if (customCell) {
+                        const oldInputs = customCell.querySelectorAll('.custom-split-person');
+                        const oldValues = {};
+                        oldInputs.forEach(inp => {
+                            oldValues[inp.getAttribute('data-person-id')] = inp.value;
+                        });
+                        let typeSel = customCell.querySelector('.custom-split-type');
+                        let typeValue = typeSel ? typeSel.value : 'percent';
+                        customSplitPreserve[rowIdx] = { oldValues, typeValue };
+                    }
+                }
+            });
+
             // Update people array from config inputs
             const personInputs = document.querySelectorAll('[id^="person-"][id$="-name"]');
             people.forEach((p, i) => {
@@ -418,7 +465,33 @@
                     select.style.borderColor = 'red';
                 }
             });
-            
+
+            // For all rows with Custom Split, update the custom split UI and validation, preserving values for existing people
+            document.querySelectorAll('.input-row').forEach((row, rowIdx) => {
+                const payerSelect = row.querySelector('.item-payer');
+                if (payerSelect && payerSelect.value === 'Custom') {
+                    const customCell = row.querySelector('.custom-split-cell');
+                    // Use preserved values if available
+                    let oldValues = {}, typeValue = 'percent';
+                    if (customSplitPreserve[rowIdx]) {
+                        oldValues = customSplitPreserve[rowIdx].oldValues;
+                        typeValue = customSplitPreserve[rowIdx].typeValue;
+                    }
+                    // Rebuild the custom split UI for all people
+                    let customInputsHtml = people.map((p, idx) =>
+                        `<input type="number" class="custom-split-person" data-person-idx="${idx}" data-person-id="${p.id}" placeholder="${p.name} % or $" min="0" style="width:${Math.max(100/people.length-2,20)}%; display:inline-block; margin-right:2px;" onchange="calculateSummary()" oninput="validateCustomSplit(this)" value="${oldValues[p.id] || ''}">`
+                    ).join('');
+                    customInputsHtml += `<select class="custom-split-type" style="width:100%; margin-top:2px;" onchange="calculateSummary(); validateCustomSplit(this)">
+                        <option value="percent"${typeValue==='percent'?' selected':''}>%</option>
+                        <option value="dollar"${typeValue==='dollar'?' selected':''}>$</option>
+                    </select>`;
+                    if (customCell) customCell.innerHTML = customInputsHtml;
+                    // Validate all custom split inputs in this row
+                    const customInputs = row.querySelectorAll('.custom-split-person');
+                    customInputs.forEach(input => validateCustomSplit(input));
+                }
+            });
+
             calculateSummary();
         }
         
@@ -467,7 +540,7 @@
             optionsHtml += `<option value="Split">Split Evenly</option><option value="Custom">Custom Split</option>`;
             newRow.innerHTML = `
                 <td><input type="text" placeholder="Enter item name" class="item-name"></td>
-                <td><input type="number" step="0.01" placeholder="0.00" class="item-cost" onchange="calculateSummary()"></td>
+                <td><input type="number" step="0.01" placeholder="0.00" class="item-cost" oninput="calculateSummary()"></td>
                 <td>
                     <select class="item-payer" onchange="handlePayerChange(this); calculateSummary(); validateCustomSplit(this)" oninput="resetPayerBorder(this)">
                         ${optionsHtml}
@@ -477,6 +550,7 @@
                 <td><button onclick="removeItem(this)">Remove</button></td>
             `;
             container.appendChild(newRow);
+            addEnterKeyListener(newRow);
         }
         
         function removeItem(button) {
@@ -546,8 +620,10 @@
             subtotals = subtotals.map(x => Math.round(x * 100) / 100);
             const totalSubtotal = subtotals.reduce((a, b) => a + b, 0);
             const taxAmount = parseFloat(document.getElementById('tax-amount').value) || 0;
+            const tipAmount = parseFloat(document.getElementById('tip-amount').value) || 0;
             // Calculate tax shares
             let taxShares = people.map(() => 0);
+            let tipShares = people.map(() => 0);
             if (totalSubtotal > 0) {
                 let distributed = 0;
                 for (let i = 0; i < people.length - 1; i++) {
@@ -555,6 +631,14 @@
                     distributed += taxShares[i];
                 }
                 taxShares[people.length - 1] = Math.round((taxAmount - distributed) * 100) / 100;
+            }
+            if (totalSubtotal > 0) {
+                let distributed = 0;
+                for (let i = 0; i < people.length - 1; i++) {
+                    tipShares[i] = Math.round((subtotals[i] / totalSubtotal * tipAmount) * 100) / 100;
+                    distributed += tipShares[i];
+                }
+                tipShares[people.length - 1] = Math.round((tipAmount - distributed) * 100) / 100;
             }
             // Update summary section
             const summaryDiv = document.querySelector('.summary');
@@ -569,17 +653,21 @@
                         <span>Tax Share:</span>
                         <span id="person${idx+1}-tax">$${taxShares[idx].toFixed(2)}</span>
                     </div>
+                    <div class="summary-row">
+                        <span>Tip Share:</span>
+                        <span id="person${idx+1}-tip">$${tipShares[idx].toFixed(2)}</span>
+                    </div>
                     <div class="summary-row total">
                         <span>Total:</span>
-                        <span id="person${idx+1}-total">$${(subtotals[idx] + taxShares[idx]).toFixed(2)}</span>
+                        <span id="person${idx+1}-total">$${(subtotals[idx] + taxShares[idx] + tipShares[idx]).toFixed(2)}</span>
                     </div>
                 </div>
             `).join('');
             // Update running total
-            updateRunningTotal(subtotals, taxShares);
+            updateRunningTotal(subtotals, taxShares, tipShares);
         }
         
-        function updateRunningTotal(subtotals, taxShares) {
+        function updateRunningTotal(subtotals, taxShares, tipShares) {
             const container = document.getElementById('running-total-container');
             container.innerHTML = '';
             const items = document.querySelectorAll('.input-row');
@@ -635,7 +723,7 @@
                         }
                         payerDisplay = 'Custom Split';
                     }
-                    shareText = people.map((p, idx) => `${p.name}: $${shares[idx].toFixed(2)}`).join(' | ');
+                    shareText = people.map((p, idx) => `${p.name}: $${shares[idx].toFixed(2)}`).join('<br/>');
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class="item-name">${name}</td>
@@ -650,7 +738,7 @@
             const taxAmount = parseFloat(document.getElementById('tax-amount').value) || 0;
             if (taxAmount > 0) {
                 const totalSubtotal = subtotals.reduce((a, b) => a + b, 0);
-                let taxShareText = people.map((p, idx) => `${p.name}: $${taxShares[idx].toFixed(2)}`).join(' | ');
+                let taxShareText = people.map((p, idx) => `${p.name}: $${taxShares[idx].toFixed(2)}`).join('<br/>');
                 const taxRow = document.createElement('tr');
                 taxRow.innerHTML = `
                     <td class="item-name">Tax</td>
@@ -660,10 +748,24 @@
                 `;
                 container.appendChild(taxRow);
             }
+            // Add tip row if there's tip
+            const tipAmount = parseFloat(document.getElementById('tip-amount').value) || 0;
+            if (tipAmount > 0) {
+                const totalSubtotal = subtotals.reduce((a, b) => a + b, 0);
+                let tipShareText = people.map((p, idx) => `${p.name}: $${tipShares[idx].toFixed(2)}`).join('<br/>');
+                const tipRow = document.createElement('tr');
+                tipRow.innerHTML = `
+                    <td class="item-name">Tip</td>
+                    <td class="item-cost">$${tipAmount.toFixed(2)}</td>
+                    <td class="item-payer">Split by ratio</td>
+                    <td class="item-share">${tipShareText}</td>
+                `;
+                container.appendChild(tipRow);
+            }
             // Add total row
-            const totals = subtotals.map((s, i) => s + taxShares[i]);
+            const totals = subtotals.map((s, i) => s + taxShares[i] + tipShares[i]);
             const grandTotal = totals.reduce((a, b) => a + b, 0);
-            const totalText = people.map((p, idx) => `${p.name}: $${totals[idx].toFixed(2)}`).join(' | ');
+            const totalText = people.map((p, idx) => `${p.name}: $${totals[idx].toFixed(2)}`).join('<br/>');
             const totalRow = document.createElement('tr');
             totalRow.innerHTML = `
                 <td class="item-name">TOTAL</td>
@@ -729,6 +831,18 @@
                 taxShares[people.length - 1] = Math.round((taxAmount - distributed) * 100) / 100;
             }
             csv += `"Tax",${taxAmount.toFixed(2)},"Split by ratio",${taxShares.map(s => s.toFixed(2)).join(',')}` + '\n';
+            // Add tip row
+            const tipAmount = parseFloat(document.getElementById('tip-amount').value) || 0;
+            let tipShares = people.map(() => 0);
+            if (totalSubtotal > 0) {
+                let distributed = 0;
+                for (let i = 0; i < people.length - 1; i++) {
+                    tipShares[i] = Math.round((subtotals[i] / totalSubtotal * tipAmount) * 100) / 100;
+                    distributed += tipShares[i];
+                }
+                tipShares[people.length - 1] = Math.round((tipAmount - distributed) * 100) / 100;
+            }
+            csv += `"Tip",${tipAmount.toFixed(2)},"Split by ratio",${tipShares.map(s => s.toFixed(2)).join(',')}` + '\n';
             // Add totals
             csv += '\n';
             const totals = people.map((_, idx) => parseFloat(document.getElementById(`person${idx+1}-total`)?.textContent?.replace('$', '') || 0));
@@ -742,13 +856,6 @@
             a.click();
             window.URL.revokeObjectURL(url);
         }
-        
-        // On page load, set people array to the values of the first two inputs if present
-        window.addEventListener('DOMContentLoaded', () => {
-            rebuildPeopleConfigList(); // Build the people config list from the initial people array
-            updatePersonNames(); // Doesn't do much unless there are more than 2 people on initial load
-            addItem(); // Add a single item row on initialization
-        });
         
         // Enable Enter key to add another item
         function addEnterKeyListener(row) {
@@ -769,16 +876,6 @@
                 });
             });
         }
-        // Add to initial row
-        addEnterKeyListener(document.querySelector('.input-row'));
-        
-        // Patch addItem to add Enter key listener to new rows
-        const originalAddItem = addItem;
-        addItem = function() {
-            originalAddItem();
-            const allRows = document.querySelectorAll('.input-row');
-            addEnterKeyListener(allRows[allRows.length - 1]);
-        };
 
         function handlePayerChange(select) {
             const row = select.closest('tr');
@@ -786,13 +883,15 @@
             if (select.value === 'Custom') {
                 // Generate custom split inputs for all people
                 let customInputsHtml = people.map((p, idx) =>
-                    `<input type="number" class="custom-split-person" data-person-idx="${idx}" placeholder="${p.name} % or $" min="0" style="width:${Math.max(100/people.length-2,20)}%; display:inline-block; margin-right:2px;" onchange="calculateSummary()" oninput="validateCustomSplit(this)">`
+                    `<input type="number" class="custom-split-person" data-person-idx="${idx}" data-person-id="${p.id}" placeholder="${p.name} % or $" min="0" style="width:${Math.max(100/people.length-2,20)}%; display:inline-block; margin-right:2px;" onchange="calculateSummary()" oninput="validateCustomSplit(this)">`
                 ).join('');
                 customInputsHtml += `<select class="custom-split-type" style="width:100%; margin-top:2px;" onchange="calculateSummary(); validateCustomSplit(this)">
                     <option value="percent">%</option>
                     <option value="dollar">$</option>
                 </select>`;
                 customCell.innerHTML = customInputsHtml;
+                // Immediately call updatePersonNames to capture the new state for preservation
+                updatePersonNames();
             } else {
                 customCell.innerHTML = '';
             }
@@ -829,6 +928,13 @@
                     (c ^ window.crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16))
                 : 'p' + Date.now() + Math.floor(Math.random()*10000);
         }
+
+        // On page load, set people array to the values of the first two inputs if present
+        window.addEventListener('DOMContentLoaded', () => {
+            rebuildPeopleConfigList(); // Build the people config list from the initial people array
+            updatePersonNames(); // Doesn't do much unless there are more than 2 people on initial load
+            addItem(); // Add a single item row on initialization
+        });
     </script>
 </body>
 </html>
