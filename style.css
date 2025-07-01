@@ -124,6 +124,18 @@ h1 {
     font-size: 15px;
     box-sizing: border-box;
 }
+.input-table button {
+    padding: 8px 15px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.input-table button:hover {
+    background: #c82333;
+}
 .input-table .item-cost {
     max-width: 100px;
     min-width: 60px;
