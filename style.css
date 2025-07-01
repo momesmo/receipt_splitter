@@ -95,8 +95,7 @@ h1 {
     vertical-align: middle;
 }
 
-.input-table th,
-.running-total-table th {
+.input-table th {
     background: #e9ecef;
     color: #666;
     font-weight: 600;
@@ -106,6 +105,7 @@ h1 {
 .running-total-table th {
     background: #ffc107;
     color: #856404;
+    font-weight: 600;
     border-bottom: 2px solid #ffc107;
     width: 25%;
 }
