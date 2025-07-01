@@ -110,6 +110,23 @@ h1 {
     width: 25%;
 }
 
+.input-table td:last-child,
+.running-total-table td:last-child {
+    text-align: left;
+}
+
+.input-table td,
+.running-total-table td {
+    background: #fff;
+}
+
+.input-table tr:last-child td,
+.running-total-table tr:last-child td {
+    border-bottom: none;
+    font-weight: bold;
+    background: #f8f9fa;
+}
+
 .input-table th:nth-child(1) { width: 25%; } /* Item Description */
 .input-table th:nth-child(2) { width: 15%; } /* Cost ($) */
 .input-table th:nth-child(3) { width: 20%; } /* Expense To */
