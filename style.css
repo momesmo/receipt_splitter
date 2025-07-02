@@ -181,6 +181,21 @@ h1 {
 .add-button:hover {
     background: #218838;
 }
+
+#add-person-btn {
+    padding: 8px 16px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+#add-person-btn:hover {
+    background: #0056b3;
+}
 .tax-section {
     background: #e9ecef;
     padding: 15px;
