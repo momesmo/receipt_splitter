@@ -1,5 +1,13 @@
 import { people } from './people.js';
 
+/**
+ * Calculates and displays cost summaries for all people
+ * @function calculateSummary
+ * @description Main calculation function that processes all items, calculates subtotals,
+ * tax shares, tip shares, and totals for each person. Updates both the summary cards
+ * and the running total table. Handles three splitting methods: individual assignment,
+ * even splits, and custom splits with percentage or dollar amounts.
+ */
 export function calculateSummary() {
     // Initialize subtotals for each person
     let subtotals = people.map(() => 0);
@@ -102,6 +110,16 @@ export function calculateSummary() {
     updateRunningTotal(subtotals, taxShares, tipShares);
 }
 
+/**
+ * Updates the running total table with detailed breakdown
+ * @function updateRunningTotal
+ * @param {Array<number>} subtotals - Array of subtotals for each person
+ * @param {Array<number>} taxShares - Array of tax shares for each person
+ * @param {Array<number>} tipShares - Array of tip shares for each person
+ * @description Creates a detailed table showing each item, its cost, how it's split,
+ * and each person's share. Includes tax and tip rows with proportional splits.
+ * Shows the grand total and each person's final total at the bottom.
+ */
 export function updateRunningTotal(subtotals, taxShares, tipShares) {
     const container = document.getElementById('running-total-container');
     container.innerHTML = '';
@@ -209,4 +227,4 @@ export function updateRunningTotal(subtotals, taxShares, tipShares) {
         <td class="item-share">${totalText}</td>
     `;
     container.appendChild(totalRow);
-} 
+}

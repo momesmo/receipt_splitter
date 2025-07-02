@@ -1,6 +1,13 @@
 import { people } from './people.js';
 import { calculateSummary } from './summary.js';
 
+/**
+ * Adds a new item row to the items table
+ * @function addItem
+ * @description Creates a new table row with input fields for item name, cost, expense assignment,
+ * and custom split options. Generates dropdown options dynamically based on current people array.
+ * Adds keyboard event listeners for Enter key navigation.
+ */
 export function addItem() {
     const container = document.getElementById('items-container');
     const newRow = document.createElement('tr');
@@ -10,7 +17,7 @@ export function addItem() {
     optionsHtml += `<option value="Split">Split Evenly</option><option value="Custom">Custom Split</option>`;
     newRow.innerHTML = `
         <td><input type="text" placeholder="Enter item name" class="item-name"></td>
-        <td><input type="number" step="0.01" placeholder="0.00" class="item-cost" oninput="window.calculateSummary()" onchange="window.validateCustomSplit(this)"></td>
+        <td><input type="number" step="0.01" placeholder="0.00" class="item-cost" oninput="window.calculateSummary()"></td>
         <td>
             <select class="item-payer" onchange="window.handlePayerChange(this); window.calculateSummary(); window.validateCustomSplit(this)" oninput="window.resetPayerBorder(this)">
                 ${optionsHtml}
@@ -23,11 +30,25 @@ export function addItem() {
     addEnterKeyListener(newRow);
 }
 
+/**
+ * Removes an item row from the items table
+ * @function removeItem
+ * @param {HTMLElement} button - The remove button element that was clicked
+ * @description Removes the parent table row of the clicked button and recalculates summaries
+ * to update totals and running totals.
+ */
 export function removeItem(button) {
     button.closest('tr').remove();
     window.calculateSummary();
 }
 
+/**
+ * Adds Enter key event listeners to a table row for quick item addition
+ * @function addEnterKeyListener
+ * @param {HTMLElement} row - The table row to add listeners to
+ * @description Attaches keydown event listeners to all input and select elements in the row.
+ * When Enter is pressed, adds a new item row and focuses the first input of the new row.
+ */
 export function addEnterKeyListener(row) {
     const inputs = row.querySelectorAll('input, select');
     inputs.forEach(input => {
@@ -47,6 +68,14 @@ export function addEnterKeyListener(row) {
     });
 }
 
+/**
+ * Handles changes to the expense assignment dropdown
+ * @function handlePayerChange
+ * @param {HTMLSelectElement} select - The select element that changed
+ * @description When "Custom Split" is selected, generates input fields for each person
+ * with percentage/dollar amount inputs and a type selector. Clears the custom split cell
+ * for other selections. Updates person names to preserve any existing custom split values.
+ */
 export function handlePayerChange(select) {
     const row = select.closest('tr');
     const customCell = row.querySelector('.custom-split-cell');
@@ -66,6 +95,14 @@ export function handlePayerChange(select) {
     }
 }
 
+/**
+ * Validates custom split inputs in real-time
+ * @function validateCustomSplit
+ * @param {HTMLElement} input - The input element that triggered validation
+ * @description Validates that the sum of all custom split inputs equals the required total
+ * (100% for percentage mode, item cost for dollar mode). Sets red border on all inputs
+ * if validation fails, normal border if validation passes.
+ */
 export function validateCustomSplit(input) {
     const row = input.closest('tr');
     const customCell = row.querySelector('.custom-split-cell');
@@ -87,6 +124,13 @@ export function validateCustomSplit(input) {
     }
 }
 
+/**
+ * Resets the border color of a select element to default
+ * @function resetPayerBorder
+ * @param {HTMLSelectElement} select - The select element to reset
+ * @description Sets the border color back to the default gray color when the user
+ * interacts with the select element, clearing any previous validation styling.
+ */
 export function resetPayerBorder(select) {
     select.style.borderColor = '#ddd';
 } 

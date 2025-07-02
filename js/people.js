@@ -1,19 +1,34 @@
 // people.js
 import { generatePersonId } from './utils.js';
 
+/**
+ * Array of people participating in the receipt split
+ * @type {Array<{id: string, name: string}>}
+ */
 export let people = [
     { id: crypto.randomUUID ? crypto.randomUUID() : 'p1', name: 'Person 1' },
     { id: crypto.randomUUID ? crypto.randomUUID() : 'p2', name: 'Person 2' }
 ];
 
-
-
+/**
+ * Adds a new person to the people array
+ * @function addPerson
+ * @description Creates a new person with a unique ID and adds them to the people array.
+ * Updates the UI configuration list and recalculates summaries.
+ */
 export function addPerson() {
     people.push({ id: generatePersonId(), name: `Person ${people.length + 1}` });
     rebuildPeopleConfigList();
     updatePersonNames();
 }
 
+/**
+ * Removes a person from the people array
+ * @function deletePerson
+ * @param {number} idx - Index of the person to delete
+ * @description Removes a person from the array, but ensures at least 2 people remain.
+ * Updates the UI configuration list and recalculates summaries.
+ */
 export function deletePerson(idx) {
     if (people.length <= 2) return; // Always keep at least 2 people
     people.splice(idx, 1);
@@ -21,6 +36,12 @@ export function deletePerson(idx) {
     updatePersonNames();
 }
 
+/**
+ * Rebuilds the people configuration UI
+ * @function rebuildPeopleConfigList
+ * @description Dynamically creates the configuration section with input fields for each person's name
+ * and delete buttons. Arranges people in a 2-column grid layout.
+ */
 export function rebuildPeopleConfigList() {
     const peopleConfigList = document.getElementById('people-config-list');
     peopleConfigList.innerHTML = '';
@@ -44,6 +65,13 @@ export function rebuildPeopleConfigList() {
     }
 }
 
+/**
+ * Updates person names and preserves custom split values
+ * @function updatePersonNames
+ * @description Updates the people array with current input values, preserves custom split configurations,
+ * updates all dropdown options, and recalculates summaries. This function handles the complex logic
+ * of maintaining state when people are added/removed or names are changed.
+ */
 export function updatePersonNames() {
     // Preserve all current custom split values for each row and person id
     const customSplitPreserve = [];

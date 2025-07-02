@@ -1,5 +1,20 @@
 import { people } from './people.js';
 
+/**
+ * Exports receipt split data to a CSV file
+ * @function exportToCSV
+ * @description Generates a comprehensive CSV file containing all items, their costs,
+ * expense assignments, and individual shares for each person. Includes tax and tip
+ * rows with proportional splits, and a final totals row. The CSV is automatically
+ * downloaded with the filename 'grocery_split.csv'.
+ * 
+ * CSV Structure:
+ * - Headers: Item, Cost, Expense To, [Person1 Share], [Person2 Share], ...
+ * - Item rows: Individual items with their split details
+ * - Tax row: Tax amount split proportionally
+ * - Tip row: Tip amount split proportionally
+ * - Totals row: Final totals for each person
+ */
 export function exportToCSV() {
     let csv = `Item,Cost,Expense To,${people.map(p => p.name + ' Share').join(',')}` + '\n';
     const items = document.querySelectorAll('.input-row');
