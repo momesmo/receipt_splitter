@@ -25,15 +25,18 @@ A modern, modular web application for splitting grocery receipts among multiple 
 
 ```
 receipt_splitter/
-├── index.html              # Main HTML file
-├── style.css               # Stylesheet
-├── js/
-│   ├── main.js            # Application entry point
-│   ├── people.js          # People management
-│   ├── items.js           # Item row management
-│   ├── summary.js         # Calculation logic
-│   ├── export.js          # CSV export functionality
-│   └── utils.js           # Utility functions
+├── app/                    # Main application directory
+│   ├── index.html         # Main HTML file
+│   ├── style.css          # Stylesheet
+│   ├── favicon.ico        # Application favicon
+│   └── js/                # JavaScript modules
+│       ├── main.js        # Application entry point
+│       ├── people.js      # People management
+│       ├── items.js       # Item row management
+│       ├── summary.js     # Calculation logic
+│       ├── export.js      # CSV export functionality
+│       └── utils.js       # Utility functions
+├── tf/                    # terraform directory (future use)
 ├── README.md              # This file
 └── TECHNICAL_DOCS.md      # Detailed technical documentation
 ```
