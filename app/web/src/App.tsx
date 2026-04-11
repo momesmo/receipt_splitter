@@ -47,6 +47,10 @@ function App() {
 
   const addPerson = () => {
     setPeople((prev) => [...prev, { id: generatePersonId(), name: `Person ${prev.length + 1}` }]);
+    queueMicrotask(() => {
+      const nodes = document.querySelectorAll<HTMLInputElement>('.person-name-input');
+      nodes[nodes.length - 1]?.focus();
+    });
   };
 
   const changePersonName = (index: number, name: string) => {
@@ -79,7 +83,7 @@ function App() {
   const addItem = () => {
     setItems((prev) => [...prev, createEmptyItem()]);
     queueMicrotask(() => {
-      const nodes = document.querySelectorAll<HTMLInputElement>('.item-name');
+      const nodes = document.querySelectorAll<HTMLInputElement>('.item-description-input');
       nodes[nodes.length - 1]?.focus();
     });
   };

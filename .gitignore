@@ -16,3 +16,7 @@ tf/ec2_assets.zip
 # Frontend (Vite)
 app/web/node_modules/
 app/web/dist/
+app/web/.vite/
+
+# Vite build output (run `npm run build` in app/web before Terraform pack)
+app/ec2/assets/

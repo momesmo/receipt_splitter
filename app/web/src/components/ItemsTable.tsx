@@ -49,7 +49,7 @@ export function ItemsTable({
                   <input
                     type="text"
                     placeholder="Enter item name"
-                    className="item-name"
+                    className="item-name item-description-input"
                     value={item.name}
                     onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
                     onKeyDown={(e) => {
