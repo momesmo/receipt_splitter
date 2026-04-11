@@ -1,250 +1,71 @@
-# Technical Documentation - Grocery Receipt Cost Splitter
+# Technical documentation — Receipt Splitter
 
 ## Overview
-The Grocery Receipt Cost Splitter is a client-side web application that helps users split grocery receipts among multiple people. It supports various splitting methods including individual assignment, even splits, and custom percentage/dollar amount splits.
 
-## Architecture
+The Receipt Splitter is a client-side React application bundled with Vite. Core splitting, tax/tip allocation, and CSV generation live in **pure TypeScript modules** under `app/web/src/lib/` so they can be covered by **Vitest** without loading the UI.
 
-### Technology Stack
-- **Frontend**: Vanilla JavaScript (ES6 modules)
-- **Styling**: CSS3
-- **Markup**: HTML5
-- **Build**: No build process required (runs directly in browser)
+## Technology stack
 
-### Module Structure
-```
-js/
-├── main.js          # Application entry point and module wiring
-├── people.js        # People management and configuration
-├── items.js         # Item row management and validation
-├── summary.js       # Calculation and summary display logic
-├── export.js        # CSV export functionality
-└── utils.js         # Utility functions
-```
+| Layer | Choice |
+|--------|--------|
+| UI | React 19 (function components, hooks) |
+| Language | TypeScript |
+| Build | Vite 8; production output goes to `app/ec2/` |
+| Tests | Vitest |
+| Deploy | Static `index.html` + hashed JS/CSS under `app/ec2/assets/` |
 
-## Module Documentation
+## Directory layout
 
-### main.js
-**Purpose**: Application entry point that wires together all modules and exposes functions to the global scope.
+### `app/web/src/lib/`
 
-**Key Functions**:
-- Imports all module functions
-- Exposes functions to `window` object for HTML event handlers
-- Initializes application on DOMContentLoaded
+| Module | Role |
+|--------|------|
+| `types.ts` | `Person`, `Item`, summary and running-row shapes |
+| `math.ts` | `round2` |
+| `ids.ts` | `generatePersonId`, `generateItemId` |
+| `splits.ts` | Subtotals, tax/tip shares, per-item share breakdown, invalid custom-line counting, payer validity |
+| `running.ts` | `buildRunningRows` for the running total table |
+| `csv.ts` | `buildCsvContent`, `downloadCsv` |
+| `itemHelpers.ts` | `createEmptyItem`, syncing custom-split maps when people change |
 
-**Dependencies**: All other modules
+### `app/web/src/components/`
 
-### people.js
-**Purpose**: Manages the people participating in the receipt split.
+- `PeopleConfig.tsx` — people grid and add/delete
+- `ItemsTable.tsx` — item rows, payer select, custom split inputs
+- `TaxTip.tsx` — tax and tip inputs
+- `SummaryPanel.tsx` — per-person subtotal / tax / tip / total
+- `RunningTotalPanel.tsx` — line-by-line breakdown + grand total
 
-**Key Exports**:
-- `people` (Array): List of people with id and name
-- `addPerson()`: Adds a new person to the list
-- `deletePerson(idx)`: Removes a person (maintains minimum of 2)
-- `rebuildPeopleConfigList()`: Updates the configuration UI
-- `updatePersonNames()`: Syncs names and preserves custom splits
+### `app/ec2/` (build output)
 
-**Data Structure**:
-```javascript
-{
-  id: string,    // Unique identifier
-  name: string   // Display name
-}
-```
+Terraform (`tf/main.tf`) zips `app/ec2/` as `ec2_assets.zip` and the EC2 user-data script unpacks it to `/opt/receipt-splitter/site`. No CDN scripts: React and dependencies are bundled into `assets/*.js`.
 
-### items.js
-**Purpose**: Manages individual item rows and their splitting logic.
+## Data flow
 
-**Key Exports**:
-- `addItem()`: Creates a new item row
-- `removeItem(button)`: Removes an item row
-- `handlePayerChange(select)`: Handles expense assignment changes
-- `validateCustomSplit(input)`: Validates custom split inputs
-- `addEnterKeyListener(row)`: Adds keyboard navigation
+1. **State** (`App.tsx`): `people`, `items`, `taxAmount`, `tipAmount`.
+2. When **person IDs** change, `syncAllItemsPeople` ensures each item’s `custom.values` has a key per person.
+3. **`computeSummary`** derives subtotals, tax/tip shares, and totals.
+4. **`buildRunningRows`** feeds the running total table.
+5. **`countInvalidCustomItems`** drives the banner and disables export when &gt; 0.
+6. **`buildCsvContent`** mirrors the same summary logic for downloads.
 
-**Splitting Methods**:
-1. **Individual**: Assigns full cost to one person
-2. **Split Evenly**: Divides cost equally among all people
-3. **Custom Split**: Allows percentage or dollar amount splits
+## Behavioral rules
 
-### summary.js
-**Purpose**: Calculates and displays cost summaries for each person.
+- **Invalid custom split** (cost &gt; 0, payer Custom, percentages or dollars do not match): that line does not contribute to subtotals; the UI shows a summary banner and disables CSV export until every custom line is valid.
+- **Enter key**: only the **item description** input adds a new row on Enter (reduced surprise vs. firing on cost/payer/custom fields).
+- **Minimum people**: two; delete is hidden when only two remain.
+- **Stale payer** after a person is removed: that item’s payer is cleared.
 
-**Key Exports**:
-- `calculateSummary()`: Main calculation function
-- `updateRunningTotal()`: Updates the running total table
+## Testing
 
-**Calculation Logic**:
-- Subtotal: Sum of assigned items per person
-- Tax Share: Proportional to subtotal ratio
-- Tip Share: Proportional to subtotal ratio
-- Total: Subtotal + Tax + Tip
+Tests live next to logic in `*.test.ts` files. They cover even-split remainder handling, proportional tax/tip, custom valid/invalid behavior, CSV escaping, and invalid custom line counting.
 
-### export.js
-**Purpose**: Generates and downloads CSV files of the split data.
+Run from `app/web`:
 
-**Key Exports**:
-- `exportToCSV()`: Creates and downloads CSV file
-
-**CSV Structure**:
-- Headers: Item, Cost, Expense To, [Person Shares]
-- Rows: Individual items, tax, tip, totals
-
-### utils.js
-**Purpose**: Provides utility functions used across modules.
-
-**Key Exports**:
-- `generatePersonId()`: Creates unique person identifiers
-- `splitAmount(amount)`: Legacy function (unused)
-
-## Data Flow
-
-### 1. Initialization
-```
-DOMContentLoaded → main.js → rebuildPeopleConfigList() → addItem()
+```bash
+npm run test
 ```
 
-### 2. Adding People
-```
-addPerson() → people.push() → rebuildPeopleConfigList() → updatePersonNames()
-```
+## Infrastructure note
 
-### 3. Adding Items
-```
-addItem() → create row → addEnterKeyListener() → calculateSummary()
-```
-
-### 4. Cost Calculation
-```
-calculateSummary() → process items → calculate shares → updateRunningTotal()
-```
-
-### 5. Export
-```
-exportToCSV() → gather data → create CSV → download file
-```
-
-## Key Algorithms
-
-### Even Split Algorithm
-```javascript
-const evenShare = Math.floor((cost / people.length) * 100) / 100;
-let distributed = evenShare * people.length;
-let remainder = Math.round((cost - distributed) * 100) / 100;
-// Assign remainder to last person
-```
-
-### Custom Split Validation
-```javascript
-// Percentage validation
-isValid = Math.abs(values.reduce((a, b) => a + b, 0) - 100) < 0.01;
-
-// Dollar validation
-isValid = Math.abs(values.reduce((a, b) => a + b, 0) - cost) < 0.01;
-```
-
-### Tax/Tip Distribution
-```javascript
-// Proportional to subtotal ratio
-share = Math.round((personSubtotal / totalSubtotal * amount) * 100) / 100;
-// Assign remainder to last person
-```
-
-## State Management
-
-### Global State
-- `people` array: Managed in people.js
-- DOM elements: Referenced by ID throughout modules
-
-### State Preservation
-- Custom split values preserved when people added/removed
-- Dropdown selections maintained by value matching
-- Form inputs synchronized with people array
-
-## Error Handling
-
-### Validation
-- Custom split inputs validated in real-time
-- Invalid splits highlighted with red borders
-- Minimum 2 people enforced
-
-### Edge Cases
-- Empty item names default to "Unnamed Item"
-- Zero costs handled gracefully
-- Missing DOM elements checked before access
-
-## Performance Considerations
-
-### DOM Manipulation
-- Batch DOM updates where possible
-- Use querySelector caching for repeated access
-- Minimize reflows by grouping style changes
-
-### Memory Management
-- Event listeners properly attached/detached
-- No memory leaks from closures
-- Efficient array operations
-
-## Browser Compatibility
-
-### Supported Features
-- ES6 Modules (modern browsers)
-- Template literals
-- Arrow functions
-- Array methods (map, reduce, filter)
-
-### Fallbacks
-- crypto.randomUUID() with fallback to custom generator
-- CSS Grid/Flexbox with fallback layouts
-
-## Testing Strategy
-
-### Manual Testing
-- Add/remove people
-- Add/remove items
-- Test all splitting methods
-- Validate calculations
-- Test CSV export
-
-### Automated Testing (Future)
-- Unit tests for calculation functions
-- Integration tests for module interactions
-- E2E tests for user workflows
-
-## Deployment
-
-### Requirements
-- Web server (local or hosted)
-- Modern browser with ES6 support
-- No build process required
-
-### File Structure
-```
-receipt_splitter/
-├── index.html
-├── style.css
-├── js/
-│   ├── main.js
-│   ├── people.js
-│   ├── items.js
-│   ├── summary.js
-│   ├── export.js
-│   └── utils.js
-└── README.md
-```
-
-## Future Enhancements
-
-### Potential Features
-- Save/load receipt data
-- Multiple receipt support
-- Receipt image upload/OCR
-- Mobile app version
-- Backend API for data persistence
-
-### Technical Improvements
-- TypeScript migration
-- Unit test coverage
-- Build process with bundling
-- Progressive Web App features
-- Accessibility improvements 
+After UI changes, run `npm run build` in `app/web` before `terraform apply` so the S3 object for `ec2_assets.zip` updates.
