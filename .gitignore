@@ -1,0 +1,18 @@
+.DS_Store
+
+# Terraform
+tf/.terraform/
+tf/*.tfstate
+tf/*.tfstate.*
+tf/terraform.tfstate
+tf/terraform.tfstate.backup
+tf/.terraform.lock.hcl
+
+# Generated artifacts
+tf/ec2-key.pem
+tf/lambda_function.zip
+tf/ec2_assets.zip
+
+# Frontend (Vite)
+app/web/node_modules/
+app/web/dist/
