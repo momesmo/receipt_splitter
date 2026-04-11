@@ -33,8 +33,15 @@ export function PeopleConfig({ people, onChangeName, onAddPerson, onDeletePerson
                     <input
                       id={`person-${person.id}-name`}
                       type="text"
+                      className="person-name-input"
                       value={person.name}
                       onChange={(e) => onChangeName(globalIdx, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          onAddPerson();
+                        }
+                      }}
                     />
                     <button
                       type="button"
