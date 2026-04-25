@@ -6,6 +6,7 @@ import {
   computeSummary,
   countInvalidCustomItems,
   evenSplitShares,
+  getCustomSplitProgress,
   isCustomSplitValid,
 } from './splits';
 import type { Item, Person } from './types';
@@ -140,6 +141,39 @@ describe('isCustomSplitValid', () => {
     };
     expect(isCustomSplitValid(item, twoPeople, 50)).toBe(true);
   });
+
+  it('rejects dollar custom split when off by one cent from line cost', () => {
+    const item: Item = {
+      id: '1',
+      name: 'x',
+      cost: 10,
+      payer: 'Custom',
+      custom: {
+        type: 'dollar',
+        values: { a: '5.00', b: '4.99' },
+      },
+    };
+    expect(isCustomSplitValid(item, twoPeople, 10)).toBe(false);
+  });
+
+  it('accepts dollar custom split when cent sums match line cost (multi-person)', () => {
+    const three: Person[] = [
+      { id: 'a', name: 'A' },
+      { id: 'b', name: 'B' },
+      { id: 'c', name: 'C' },
+    ];
+    const item: Item = {
+      id: '1',
+      name: 'x',
+      cost: 100,
+      payer: 'Custom',
+      custom: {
+        type: 'dollar',
+        values: { a: '33.33', b: '33.33', c: '33.34' },
+      },
+    };
+    expect(isCustomSplitValid(item, three, 100)).toBe(true);
+  });
 });
 
 describe('countInvalidCustomItems', () => {
@@ -175,5 +209,48 @@ describe('computeSharesForItem', () => {
     };
     const { shares } = computeSharesForItem(item, twoPeople);
     expect(shares.every((s) => s === 0)).toBe(true);
+  });
+});
+
+describe('getCustomSplitProgress', () => {
+  it('tracks percent toward 100', () => {
+    const item: Item = {
+      id: '1',
+      name: 'x',
+      cost: 50,
+      payer: 'Custom',
+      custom: { type: 'percent', values: { a: '50', b: '25' } },
+    };
+    const p = getCustomSplitProgress(item, twoPeople, 50);
+    expect(p?.mode).toBe('percent');
+    expect(p?.current).toBe(75);
+    expect(p?.target).toBe(100);
+    expect(p?.ratio).toBe(0.75);
+  });
+
+  it('tracks dollars toward line cost', () => {
+    const item: Item = {
+      id: '1',
+      name: 'x',
+      cost: 40,
+      payer: 'Custom',
+      custom: { type: 'dollar', values: { a: '10', b: '10' } },
+    };
+    const p = getCustomSplitProgress(item, twoPeople, 40);
+    expect(p?.mode).toBe('dollar');
+    expect(p?.current).toBe(20);
+    expect(p?.target).toBe(40);
+    expect(p?.ratio).toBe(0.5);
+  });
+
+  it('returns null when payer is not Custom', () => {
+    const item: Item = {
+      id: '1',
+      name: 'x',
+      cost: 10,
+      payer: 'Split',
+      custom: { type: 'percent', values: {} },
+    };
+    expect(getCustomSplitProgress(item, twoPeople, 10)).toBeNull();
   });
 });
