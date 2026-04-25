@@ -1,7 +1,16 @@
 import type { Item, Person, SummaryResult } from './types';
-import { round2 } from './math';
+import { dollarsToCents, round2 } from './math';
 
-const TOL = 0.01;
+/** Sum of entered dollar amounts as integer cents (each input rounded per line). */
+function sumCustomDollarInputsCents(values: number[]): number {
+  return values.reduce((sum, v) => sum + dollarsToCents(v), 0);
+}
+
+/** Percent points × 100 (basis points): 100% === 10_000. */
+function sumCustomPercentBasisPoints(values: number[]): number {
+  const sumPercent = values.reduce((a, b) => a + b, 0);
+  return Math.round(sumPercent * 100);
+}
 
 export function evenSplitShares(cost: number, nPeople: number): number[] {
   if (nPeople <= 0) return [];
@@ -19,15 +28,51 @@ function parseCustomValues(item: Item, people: Person[]): number[] {
   return people.map((p) => parseFloat(item.custom.values[p.id] ?? '') || 0);
 }
 
+/** Progress toward 100% or full line cost for custom-split rows (null if not Custom payer). */
+export function getCustomSplitProgress(
+  item: Item,
+  people: Person[],
+  cost: number,
+): {
+  current: number;
+  target: number;
+  mode: 'percent' | 'dollar';
+  /** current/target; 1 when valid; can exceed 1 if over-allocated */
+  ratio: number;
+} | null {
+  if (item.payer !== 'Custom') return null;
+  const values = parseCustomValues(item, people);
+  if (item.custom.type === 'percent') {
+    const sum = values.reduce((a, b) => a + b, 0);
+    return { current: sum, target: 100, mode: 'percent', ratio: sum / 100 };
+  }
+  if (item.custom.type === 'dollar') {
+    if (cost <= 0) {
+      const sumDollars = sumCustomDollarInputsCents(values) / 100;
+      return { current: sumDollars, target: 0, mode: 'dollar', ratio: 0 };
+    }
+    const sumCents = sumCustomDollarInputsCents(values);
+    const costCents = dollarsToCents(cost);
+    const sumDollars = sumCents / 100;
+    return {
+      current: sumDollars,
+      target: cost,
+      mode: 'dollar',
+      ratio: costCents > 0 ? sumCents / costCents : 0,
+    };
+  }
+  return null;
+}
+
 export function isCustomSplitValid(item: Item, people: Person[], cost: number): boolean {
   if (item.payer !== 'Custom') return true;
   if (cost <= 0) return true;
   const values = parseCustomValues(item, people);
   if (item.custom.type === 'percent') {
-    return Math.abs(values.reduce((a, b) => a + b, 0) - 100) < TOL;
+    return sumCustomPercentBasisPoints(values) === 10_000;
   }
   if (item.custom.type === 'dollar') {
-    return Math.abs(values.reduce((a, b) => a + b, 0) - cost) < TOL;
+    return sumCustomDollarInputsCents(values) === dollarsToCents(cost);
   }
   return true;
 }

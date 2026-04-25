@@ -1,6 +1,6 @@
 import type { Item, Person } from '../lib/types';
 import { syncCustomValuesWithPeople } from '../lib/itemHelpers';
-import { isCustomSplitValid, isPayerValid } from '../lib/splits';
+import { getCustomSplitProgress, isCustomSplitValid, isPayerValid } from '../lib/splits';
 
 type Props = {
   items: Item[];
@@ -13,6 +13,62 @@ type Props = {
 
 function customInputWidthPct(nPeople: number): number {
   return Math.max(100 / nPeople - 2, 20);
+}
+
+function CustomSplitProgressBar({
+  item,
+  people,
+  cost,
+}: {
+  item: Item;
+  people: Person[];
+  cost: number;
+}) {
+  const progress = getCustomSplitProgress(item, people, cost);
+  if (!progress) return null;
+
+  const { current, target, mode, ratio } = progress;
+  const barPct = Math.min(100, ratio * 100);
+  const over = ratio > 1;
+  const complete =
+    cost > 0 &&
+    item.payer === 'Custom' &&
+    isCustomSplitValid(item, people, cost);
+
+  if (mode === 'dollar' && target <= 0) {
+    return (
+      <div className="custom-split-progress">
+        <div className="custom-split-progress-label muted">Enter line cost to track dollar split</div>
+      </div>
+    );
+  }
+
+  const label =
+    mode === 'percent'
+      ? `${current.toFixed(1)}% of 100%`
+      : `$${current.toFixed(2)} of $${target.toFixed(2)}`;
+
+  const ariaMax = mode === 'percent' ? 100 : target;
+  const ariaNow = mode === 'percent' ? current : current;
+
+  return (
+    <div className="custom-split-progress">
+      <div className="custom-split-progress-label">{label}</div>
+      <div
+        className="custom-split-progress-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={ariaMax}
+        aria-valuenow={ariaNow}
+        aria-label={mode === 'percent' ? 'Percent allocated toward 100%' : 'Dollars allocated toward line cost'}
+      >
+        <div
+          className={`custom-split-progress-fill${over ? ' over' : ''}${complete ? ' complete' : ''}`}
+          style={{ width: `${barPct}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function ItemsTable({
@@ -154,6 +210,7 @@ export function ItemsTable({
                         <option value="percent">%</option>
                         <option value="dollar">$</option>
                       </select>
+                      <CustomSplitProgressBar item={item} people={people} cost={cost} />
                       {customInvalid && (
                         <div className="validation-message">
                           Custom split must total 100% or match item cost.
