@@ -5,6 +5,7 @@ A web application for splitting grocery receipts among multiple people with flex
 ## Features
 
 ### Core functionality
+
 - **Multi-person support**: Add people to split receipts among
 - **Flexible splitting**:
   - Assign items to individual people
@@ -15,6 +16,7 @@ A web application for splitting grocery receipts among multiple people with flex
 - **CSV export** for Excel or accounting tools
 
 ### User experience
+
 - **Dynamic UI** for any number of people
 - **Custom split values** preserved when people are added or removed
 - **Validation** with clear feedback; invalid custom splits are called out in a banner and block CSV export until fixed
@@ -42,14 +44,17 @@ receipt_splitter/
 ## Technology stack
 
 - **Frontend**: React 19, TypeScript
+- **Python app**: Streamlit
 - **Build**: Vite 8
 - **Tests**: Vitest (core math and CSV in `app/web/src/lib/`)
+- **Python tests**: Pytest (`app/tests/`)
 - **Styling**: CSS (see `app/web/src/style.css`)
 - **Deploy**: Static files under `app/ec2/` are zipped by Terraform and served from EC2 via Python’s `http.server`
 
 ## User guide
 
 ### Getting started
+
 1. **Configure people** with the "+ Add Person" button
 2. **Add items** with description and cost
 3. **Expense To**: choose a person, "Split Evenly", or "Custom Split"
@@ -57,11 +62,13 @@ receipt_splitter/
 5. **Review** the summary and running total, then **Export to CSV** if needed
 
 ### Custom split
+
 - **Percent**: entries must total 100%
 - **Dollar**: entries must total the line cost
 - Invalid lines are excluded from group totals until fixed; export stays disabled until all custom splits are valid
 
 ### Keyboard
+
 - **Enter** on the **item description** field adds another item row (other fields do not)
 - **Tab** moves between fields as usual
 
@@ -77,11 +84,25 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
+### Streamlit local development
+
+```bash
+cd app
+python3 -m pip install -r requirements.txt
+python3 -m streamlit run streamlit_app.py
+```
+
+Open the local Streamlit URL shown in the terminal (usually `http://localhost:8501`).
+
 ### Tests
 
 ```bash
 cd app/web
 npm run test
+```
+
+```bash
+python3 -m pytest app/tests
 ```
 
 ### Production build
@@ -106,6 +127,12 @@ Always run `npm run build` in `app/web` before `terraform apply` if the UI chang
 
 - **README.md** (this file): overview and workflows
 - **TECHNICAL_DOCS.md**: architecture and module layout
+
+## Streamlit migration notes
+
+- Streamlit implementation lives in `app/streamlit_app.py` and `app/streamlit_domain/`.
+- Domain calculations (split logic, rounding, CSV generation, running totals) are implemented in Python for parity with the React behavior.
+- React app under `app/web/` remains available for side-by-side validation during migration.
 
 ## License
 
