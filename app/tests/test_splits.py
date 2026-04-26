@@ -121,6 +121,20 @@ def test_get_custom_split_progress_percent() -> None:
     assert progress["ratio"] == 0.75
 
 
+def test_custom_percent_validation_allows_high_precision_values() -> None:
+    item = Item(
+        id="1",
+        name="x",
+        cost=100,
+        payer="Custom",
+        custom=CustomSplit(
+            type="percent",
+            values={"a": "33.333333", "b": "66.666667"},
+        ),
+    )
+    assert is_custom_split_valid(item, two_people, 100) is True
+
+
 def test_dollars_to_cents_parity() -> None:
     assert dollars_to_cents(5.0) + dollars_to_cents(4.99) == 999
     assert dollars_to_cents(10.0) == 1000

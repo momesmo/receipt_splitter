@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from .math_utils import dollars_to_cents, round2
 from .models import Item, Person, SummaryResult
 
@@ -19,8 +21,9 @@ def _sum_custom_dollar_inputs_cents(values: list[float]) -> int:
     return sum(dollars_to_cents(v) for v in values)
 
 
-def _sum_custom_percent_basis_points(values: list[float]) -> int:
-    return round(sum(values) * 100)
+PERCENT_TARGET = 100.0
+# Keep tiny epsilon for float math while allowing arbitrary decimal precision.
+PERCENT_TOLERANCE = 1e-9
 
 
 def even_split_shares(cost: float, n_people: int) -> list[float]:
@@ -60,7 +63,7 @@ def is_custom_split_valid(item: Item, people: list[Person], cost: float) -> bool
         return True
     values = _parse_custom_values(item, people)
     if item.custom.type == "percent":
-        return _sum_custom_percent_basis_points(values) == 10_000
+        return math.isclose(sum(values), PERCENT_TARGET, rel_tol=0.0, abs_tol=PERCENT_TOLERANCE)
     if item.custom.type == "dollar":
         return _sum_custom_dollar_inputs_cents(values) == dollars_to_cents(cost)
     return True
